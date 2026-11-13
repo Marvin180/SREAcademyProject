@@ -12,3 +12,6 @@ Accesing from outside:
 
 ### Testing the new image
 ![New image running in a container](image-3.png)
+
+### Deployment + service created: app deployed and accesible from outside the cluster
+![App deployed and accesible](image-4.png)

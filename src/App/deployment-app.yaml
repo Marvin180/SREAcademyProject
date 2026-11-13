@@ -17,6 +17,6 @@ spec:
     spec:
       containers:
       - name: orders-app
-        image: marvins123/orders-app:v1
+        image: marvins123/orders-app:v2
         ports:
         - containerPort: 80

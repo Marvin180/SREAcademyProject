@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: orders-app-service
 spec:
-  type: NodePort # You'll be able to contact the type: NodePort Service, from outside the cluster ...
+  type: NodePort # You'll be able to contact the type: NodePort Service, from outside the cluster (documentation) ...
   selector:
     app.kubernetes.io/name: orders-app
   ports:
