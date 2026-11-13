@@ -1,8 +1,10 @@
+import asyncio
 import random
 import time
 
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
+from starlette.routing import Match
 
 app = FastAPI()
 
@@ -29,6 +31,47 @@ REQUESTS_IN_PROGRESS = Gauge(
 )
 
 
+def _get_endpoint_label(request: Request) -> str:
+    """Resolve the FastAPI route template (e.g. '/get-customers/{customer}') to prevent high cardinality."""
+    route = request.scope.get("route")
+    if route is not None and hasattr(route, "path"):
+        return route.path
+
+    partial_match = None
+    for candidate in request.app.routes:
+        match, _ = candidate.matches(request.scope)
+        if match is Match.FULL and hasattr(candidate, "path"):
+            return candidate.path
+        if match is Match.PARTIAL and partial_match is None and hasattr(candidate, "path"):
+            partial_match = candidate.path
+
+    return partial_match or "unmatched"
+
+
+@app.middleware("http")
+async def prometheus_metrics_middleware(request: Request, call_next):
+    """Track request count, latency, and active in-flight requests for every route."""
+    if request.url.path == "/metrics":
+        return await call_next(request)
+
+    method = request.method
+    endpoint = _get_endpoint_label(request)
+
+    REQUESTS_IN_PROGRESS.labels(method=method, endpoint=endpoint).inc()
+    start_time = time.perf_counter()
+    status = "500"
+
+    try:
+        response = await call_next(request)
+        status = str(response.status_code)
+        return response
+    finally:
+        duration = time.perf_counter() - start_time
+        REQUESTS_IN_PROGRESS.labels(method=method, endpoint=endpoint).dec()
+        REQUEST_LATENCY.labels(method=method, endpoint=endpoint).observe(duration)
+        REQUEST_COUNT.labels(method=method, endpoint=endpoint, status=status).inc()
+
+
 @app.get("/metrics", include_in_schema=False)
 def metrics():
     """Expose application and Python runtime metrics in Prometheus text format."""
@@ -38,7 +81,7 @@ def metrics():
 @app.get("/")
 async def root():
     random_seconds = random.randrange(0, 2)
-    time.sleep(random_seconds)
+    await asyncio.sleep(random_seconds)
     return {"message": "Hello World"}
 
 @app.get("/get-orders")
@@ -143,6 +186,9 @@ def get_customer(customer):
             "address": "78 Pine Rd, Miami, FL 33101, US",
         },
     }
+
+    if customer not in list_of_customers:
+        raise HTTPException(status_code=404, detail="Customer not found")
 
     return list_of_customers[customer]
 
