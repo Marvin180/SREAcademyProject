@@ -6,3 +6,9 @@ I use minikube service orders-app-service --url to access my project from outsid
 
 Accesing from outside:
 ![Localhost minikube service url](image-1.png)
+
+### Added new code (instrumentation) and created a new image with that
+![New images](image-2.png)
+
+### Testing the new image
+![New image running in a container](image-3.png)
