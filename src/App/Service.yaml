@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders-app-service
+spec:
+  type: NodePort # You'll be able to contact the type: NodePort Service, from outside the cluster ...
+  selector:
+    app.kubernetes.io/name: orders-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+      nodePort: 30007

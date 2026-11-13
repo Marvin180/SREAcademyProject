@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-app-deployment
+  labels:
+    app: orders-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: orders-app
+  template:
+    metadata:
+      labels:
+        app: orders-app
+        app.kubernetes.io/name: orders-app
+    spec:
+      containers:
+      - name: orders-app
+        image: marvins123/orders-app:v1
+        ports:
+        - containerPort: 80
