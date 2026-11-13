@@ -1,6 +1,9 @@
+# Python / uv virtual environment
 .venv/
 
+# Python bytecode cache (e.g., src/__pycache__/main.cpython-312.pyc)
 __pycache__/
 *.pyc
 
+# Local scratch notes
 IGNORE.md

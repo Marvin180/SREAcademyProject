@@ -1,9 +1,38 @@
-from fastapi import FastAPI
-
-import time
 import random
+import time
+
+from fastapi import FastAPI, Response
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 
 app = FastAPI()
+
+# --- Prometheus Metrics Definitions ---
+# Counter: monotonically increasing value (ideal for total requests or errors)
+REQUEST_COUNT = Counter(
+    "http_requests_total",
+    "Total number of HTTP requests",
+    ["method", "endpoint", "status"],
+)
+
+# Histogram: observes value distributions in buckets (ideal for request latency)
+REQUEST_LATENCY = Histogram(
+    "http_request_duration_seconds",
+    "HTTP request latency in seconds",
+    ["method", "endpoint"],
+)
+
+# Gauge: value that can go up and down (ideal for active in-flight requests)
+REQUESTS_IN_PROGRESS = Gauge(
+    "http_requests_in_progress",
+    "Number of HTTP requests currently in progress",
+    ["method", "endpoint"],
+)
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics():
+    """Expose application and Python runtime metrics in Prometheus text format."""
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.get("/")
