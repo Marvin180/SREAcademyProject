@@ -3,11 +3,16 @@ kind: Service
 metadata:
   name: orders-app-service
 spec:
-  type: NodePort # You'll be able to contact the type: NodePort Service, from outside the cluster (documentation) ...
+  # Expose the Service externally on the Minikube node IP via a static NodePort
+  type: NodePort
+  # Route traffic to pods matching this label
   selector:
     app.kubernetes.io/name: orders-app
   ports:
     - protocol: TCP
+      # Internal cluster port for this Service
       port: 80
+      # Port the FastAPI container listens on (containerPort in Deployment)
       targetPort: 80
+      # External port exposed on the Minikube node (range 30000-32767)
       nodePort: 30007

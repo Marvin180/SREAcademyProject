@@ -5,6 +5,7 @@ metadata:
   labels:
     app: orders-app
 spec:
+  # Maintain 2 pod replicas for availability and load distribution
   replicas: 2
   selector:
     matchLabels:
@@ -14,6 +15,11 @@ spec:
       labels:
         app: orders-app
         app.kubernetes.io/name: orders-app
+      # Allow Prometheus to automatically discover and scrape metrics from each pod
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "80"
+        prometheus.io/path: "/metrics"
     spec:
       containers:
       - name: orders-app
