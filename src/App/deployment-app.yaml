@@ -20,3 +20,30 @@ spec:
         image: marvins123/orders-app:v2
         ports:
         - containerPort: 80
+        resources:
+          # Minimum guaranteed resources reserved on the node for each pod
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          # Maximum resources allowed before CPU throttling or OOMKill
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+        # Controls when the pod is ready to receive traffic from the Service
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 2
+          failureThreshold: 3
+        # Restarts the container automatically if FastAPI stops responding
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: 80
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          timeoutSeconds: 2
+          failureThreshold: 3
