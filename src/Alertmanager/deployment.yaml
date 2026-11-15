@@ -1,0 +1,65 @@
+# Deploy Prometheus Alertmanager inside the monitoring namespace
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager-deployment
+  namespace: monitoring
+  labels:
+    app: alertmanager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alertmanager
+  template:
+    metadata:
+      labels:
+        app: alertmanager
+    spec:
+      containers:
+        - name: alertmanager
+          image: prom/alertmanager:v0.28.1
+          args:
+            - "--config.file=/etc/alertmanager/alertmanager.yml"
+            - "--storage.path=/alertmanager"
+          ports:
+            - containerPort: 9093
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+          # Built-in Alertmanager readiness endpoint
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: 9093
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          # Built-in Alertmanager liveness endpoint
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: 9093
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            timeoutSeconds: 2
+            failureThreshold: 3
+          volumeMounts:
+            # Mount alertmanager.yml from the alertmanager-config ConfigMap
+            - name: alertmanager-config-volume
+              mountPath: /etc/alertmanager
+              readOnly: true
+            # Ephemeral storage for active silences and notification logs
+            - name: alertmanager-storage-volume
+              mountPath: /alertmanager
+      volumes:
+        - name: alertmanager-config-volume
+          configMap:
+            name: alertmanager-config
+        - name: alertmanager-storage-volume
+          emptyDir: {}

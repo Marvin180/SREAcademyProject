@@ -1,0 +1,20 @@
+# Expose Alertmanager internally for Prometheus and externally via NodePort on Minikube
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager-service
+  namespace: monitoring
+  labels:
+    app: alertmanager
+spec:
+  type: NodePort
+  selector:
+    app: alertmanager
+  ports:
+    - protocol: TCP
+      # Internal cluster port used by Prometheus (http://alertmanager-service.monitoring.svc.cluster.local:9093)
+      port: 9093
+      # Port Alertmanager listens on inside the container
+      targetPort: 9093
+      # External port exposed on the Minikube node (range 30000-32767)
+      nodePort: 30093

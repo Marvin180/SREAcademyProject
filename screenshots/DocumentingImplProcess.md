@@ -36,4 +36,6 @@ Accesing from outside:
 Sent traffic with the script
 ![Traffic in grafana](image-9.png)
 
-
+### Monitoring stack so far
+The requirement number 5 says "Alertmanager DEPLOYMENT", so i investigated and found there is a sofware developed by the same people who developed prometheus that allows me to deploy an alertmanager software.
+![Monitorin stack](image-10.png)
