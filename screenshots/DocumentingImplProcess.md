@@ -32,6 +32,8 @@ Accesing from outside:
 ![http_request_total](image-8.png)
 
 
-
+### Golden signals dashboard
+Sent traffic with the script
+![Traffic in grafana](image-9.png)
 
 
