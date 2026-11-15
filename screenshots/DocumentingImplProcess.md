@@ -39,3 +39,33 @@ Sent traffic with the script
 ### Monitoring stack so far
 The requirement number 5 says "Alertmanager DEPLOYMENT", so i investigated and found there is a sofware developed by the same people who developed prometheus that allows me to deploy an alertmanager software.
 ![Monitorin stack](image-10.png)
+
+
+### High error rate fired
+![Pending](image-11.png)
+
+![Fired](image-12.png)
+
+![From alertmanager](image-13.png)
+
+![From Alertmnger](image-14.png)
+
+
+### Orders-app down fired
+Command to trigger: kubectl scale deployment/orders-app-deployment --replicas=0
+
+To go back healthy: 
+kubectl scale deployment/orders-app-deployment --replicas=2                                                                                       
+
+kubectl rollout status deployment/orders-app-deployment 
+From prometheus:
+![app down](image-15.png)
+
+From Alertmanager: 
+Tested it with the latency mode of the script
+![Alert manager](image-16.png)
+
+### High latency fired
+![High latency fired](image-17.png)
+
+![Alert manager](image-18.png)
