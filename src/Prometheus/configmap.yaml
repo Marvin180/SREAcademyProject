@@ -1,0 +1,72 @@
+# Prometheus configuration stored separately from the container image
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+  labels:
+    app: prometheus
+data:
+  prometheus.yml: |
+    global:
+      # How often Prometheus pulls /metrics from all targets
+      scrape_interval: 15s
+      # How often Prometheus evaluates alerting/recording rules
+      evaluation_interval: 15s
+
+    scrape_configs:
+      # Self-monitoring: scrape Prometheus's own metrics
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+
+      # Automatically discover and scrape Pods annotated with prometheus.io/scrape: "true"
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          # Keep only pods that explicitly opt in for scraping
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          # Use custom metrics path if prometheus.io/path is set (defaults to /metrics)
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          # Combine pod IP and prometheus.io/port annotation into <ip>:<port>
+          - source_labels: [__meta_kubernetes_pod_ip, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+);(.+)
+            replacement: ${1}:${2}
+            target_label: __address__
+          # Preserve pod labels (e.g., app="orders-app") as Prometheus metric labels
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          # Add readable namespace and pod name labels to every scraped metric
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: kubernetes_pod_name
+
+      # Scrape container CPU/memory/network metrics from kubelet's built-in cAdvisor via API server proxy
+      - job_name: 'kubernetes-nodes-cadvisor'
+        kubernetes_sd_configs:
+          - role: node
+        scheme: https
+        tls_config:
+          # Minikube uses self-signed cluster certificates
+          insecure_skip_verify: true
+        # Authenticate against the Kubernetes API server using the mounted ServiceAccount token
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+          - target_label: __address__
+            replacement: kubernetes.default.svc:443
+          - source_labels: [__meta_kubernetes_node_name]
+            regex: (.+)
+            target_label: __metrics_path__
+            replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
