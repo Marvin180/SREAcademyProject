@@ -21,3 +21,7 @@ Accesing from outside:
 ![Prometheus showing metrics](image-5.png)
 
 
+### Got Grafana working, still not connected to prometheus
+![Grafana UI](image-6.png)
+
+

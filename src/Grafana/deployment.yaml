@@ -1,0 +1,65 @@
+# Deploy Grafana inside the monitoring namespace for dashboard visualization
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana-deployment
+  namespace: monitoring
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      # Ensure mounted volumes are writable by the official Grafana non-root user (UID/GID 472)
+      securityContext:
+        fsGroup: 472
+      containers:
+        - name: grafana
+          image: grafana/grafana:11.6.0
+          ports:
+            - containerPort: 3000
+          env:
+            # Default admin credentials for local Minikube testing
+            - name: GF_SECURITY_ADMIN_USER
+              value: "admin"
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: "admin"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          # Built-in Grafana health endpoint
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          # Restart container if Grafana stops responding on /api/health
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 2
+            failureThreshold: 3
+          volumeMounts:
+            # Temporary local storage for Grafana's internal SQLite database and plugins
+            - name: grafana-storage
+              mountPath: /var/lib/grafana
+      volumes:
+        # Ephemeral pod-scoped storage (sufficient for Minikube; provisioning ConfigMaps will hold datasources & dashboards)
+        - name: grafana-storage
+          emptyDir: {}

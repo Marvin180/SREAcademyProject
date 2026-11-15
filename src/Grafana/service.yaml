@@ -1,0 +1,20 @@
+# Expose the Grafana web UI externally via NodePort on Minikube
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-service
+  namespace: monitoring
+  labels:
+    app: grafana
+spec:
+  type: NodePort
+  selector:
+    app: grafana
+  ports:
+    - protocol: TCP
+      # Internal cluster port for Grafana HTTP traffic
+      port: 3000
+      # Port Grafana listens on inside the container
+      targetPort: 3000
+      # External port exposed on the Minikube node (range 30000-32767)
+      nodePort: 30030
