@@ -1,0 +1,5 @@
+# Dedicated namespace to isolate monitoring and observability components (Prometheus, Grafana, Alertmanager)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
