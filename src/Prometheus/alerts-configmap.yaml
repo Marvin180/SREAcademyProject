@@ -1,0 +1,57 @@
+# Prometheus alerting rules for orders-app availability, error rate, and latency
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: monitoring
+  labels:
+    app: prometheus
+data:
+  alerts.yml: |
+    groups:
+      - name: orders-app-alerts
+        rules:
+          # Critical: fires if any orders-app pod fails scrape or zero replicas are up
+          - alert: OrdersAppDown
+            expr: up{app="orders-app"} == 0 or absent(up{app="orders-app"} == 1)
+            for: 30s
+            labels:
+              severity: critical
+              app: orders-app
+              namespace: default
+            annotations:
+              summary: "orders-app instance is down"
+              description: "No healthy orders-app pods are reachable for Prometheus scraping for more than 30 seconds."
+
+          # Warning: fires when 4xx/5xx error ratio exceeds 5% over a 2-minute window
+          - alert: HighHttpErrorRate
+            expr: |
+              (
+                sum(rate(http_requests_total{app="orders-app", status=~"4..|5.."}[2m]))
+                /
+                sum(rate(http_requests_total{app="orders-app"}[2m]))
+              ) * 100 > 5
+            for: 30s
+            labels:
+              severity: warning
+              app: orders-app
+              namespace: default
+            annotations:
+              summary: "High HTTP error rate on orders-app ({{ printf \"%.1f\" $value }}%)"
+              description: "More than 5% of HTTP requests to orders-app returned 4xx/5xx over the last 2 minutes."
+
+          # Warning: fires when p95 latency stays above 3.5s (calibrated for /get-orders 0-4s simulated sleep)
+          - alert: HighHttpLatencyP95
+            expr: |
+              histogram_quantile(
+                0.95,
+                sum(rate(http_request_duration_seconds_bucket{app="orders-app"}[2m])) by (le)
+              ) > 3.5
+            for: 1m
+            labels:
+              severity: warning
+              app: orders-app
+              namespace: default
+            annotations:
+              summary: "High p95 HTTP latency on orders-app ({{ printf \"%.2f\" $value }}s)"
+              description: "95th percentile HTTP request latency on orders-app exceeded 3.5 seconds for 1 minute."
