@@ -1,0 +1,68 @@
+# Deploy the Prometheus server inside the monitoring namespace
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-deployment
+  namespace: monitoring
+  labels:
+    app: prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      # Attach the dedicated ServiceAccount with RBAC permissions to query the Kubernetes API
+      serviceAccountName: prometheus
+      containers:
+        - name: prometheus
+          image: prom/prometheus:latest
+          args:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            - "--storage.tsdb.path=/prometheus/"
+            - "--storage.tsdb.retention.time=10d"
+            # Allow live configuration reloads via POST /-/reload
+            - "--web.enable-lifecycle"
+          ports:
+            - containerPort: 9090
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          # Built-in Prometheus readiness endpoint (returns 200 once TSDB is loaded)
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: 9090
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+          # Built-in Prometheus liveness endpoint
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: 9090
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            timeoutSeconds: 2
+          volumeMounts:
+            # Mount prometheus.yml from the prometheus-config ConfigMap
+            - name: prometheus-config-volume
+              mountPath: /etc/prometheus/
+            # Mount temporary storage for Prometheus time-series database (TSDB)
+            - name: prometheus-storage-volume
+              mountPath: /prometheus/
+      volumes:
+        - name: prometheus-config-volume
+          configMap:
+            name: prometheus-config
+        # Ephemeral pod-scoped storage (sufficient for Minikube; use a PVC in production)
+        - name: prometheus-storage-volume
+          emptyDir: {}

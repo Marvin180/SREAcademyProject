@@ -1,0 +1,20 @@
+# Expose the Prometheus web UI and HTTP API externally via NodePort on Minikube
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-service
+  namespace: monitoring
+  labels:
+    app: prometheus
+spec:
+  type: NodePort
+  selector:
+    app: prometheus
+  ports:
+    - protocol: TCP
+      # Internal cluster port used by Grafana (e.g. http://prometheus-service.monitoring.svc.cluster.local:9090)
+      port: 9090
+      # Port Prometheus listens on inside the container
+      targetPort: 9090
+      # External port exposed on the Minikube node (range 30000-32767)
+      nodePort: 30090

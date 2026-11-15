@@ -15,3 +15,9 @@ Accesing from outside:
 
 ### Deployment + service created: app deployed and accesible from outside the cluster
 ![App deployed and accesible](image-4.png)
+
+
+### Prometheus showing some metrics
+![Prometheus showing metrics](image-5.png)
+
+
