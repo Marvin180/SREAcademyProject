@@ -59,7 +59,14 @@ spec:
             # Temporary local storage for Grafana's internal SQLite database and plugins
             - name: grafana-storage
               mountPath: /var/lib/grafana
+            # Auto-provision Prometheus data source on startup
+            - name: grafana-datasources-volume
+              mountPath: /etc/grafana/provisioning/datasources
+              readOnly: true
       volumes:
         # Ephemeral pod-scoped storage (sufficient for Minikube; provisioning ConfigMaps will hold datasources & dashboards)
         - name: grafana-storage
           emptyDir: {}
+        - name: grafana-datasources-volume
+          configMap:
+            name: grafana-datasources

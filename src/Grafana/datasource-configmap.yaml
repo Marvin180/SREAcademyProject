@@ -1,0 +1,25 @@
+# Provision Prometheus automatically as Grafana's default data source on startup
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: monitoring
+  labels:
+    app: grafana
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        # Fixed UID so provisioned dashboards can reliably reference this data source
+        uid: prometheus
+        # Server-side proxy: Grafana pod queries Prometheus inside the cluster network
+        access: proxy
+        # Kubernetes internal DNS for prometheus-service in the monitoring namespace
+        url: http://prometheus-service.monitoring.svc.cluster.local:9090
+        isDefault: true
+        editable: true
+        jsonData:
+          # Match Prometheus global scrape_interval so $__rate_interval stays accurate
+          timeInterval: "15s"

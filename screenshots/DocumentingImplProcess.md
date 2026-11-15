@@ -25,3 +25,13 @@ Accesing from outside:
 ![Grafana UI](image-6.png)
 
 
+### Successfully queried the Prometheus API
+![Prometheus was queried](image-7.png)
+
+### Testing http_request_total
+![http_request_total](image-8.png)
+
+
+
+
+
