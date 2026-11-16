@@ -1,71 +1,95 @@
+# Implementation Process & Visual Evidence
 
-### Deployment of the app
-As a first step, i created a deployment and a service.
-I use minikube service orders-app-service --url to access my project from outside.
+This document records the step-by-step deployment, instrumentation, observability verification, and alert testing carried out on Minikube.
+
+---
+
+### 1. Application Deployment & External Access
+Created the initial `Deployment` and `NodePort` `Service` (`orders-app-service`), then exposed the service locally using `minikube service orders-app-service --url`.
+
 ![Deployment](image.png)
 
-Accesing from outside:
+Accessing the service from outside the cluster:
 ![Localhost minikube service url](image-1.png)
 
-### Added new code (instrumentation) and created a new image with that
+---
+
+### 2. Prometheus Instrumentation & Updated Container Image
+Instrumented `src/main.py` with `prometheus_client` metrics (`http_requests_total`, `http_request_duration_seconds`, `http_requests_in_progress`) and built the updated Docker image (`marvins123/orders-app:v2`).
+
 ![New images](image-2.png)
 
-### Testing the new image
+Testing the updated container image locally:
 ![New image running in a container](image-3.png)
 
-### Deployment + service created: app deployed and accesible from outside the cluster
-![App deployed and accesible](image-4.png)
+Redeployed `orders-app` (`Deployment` + `Service`) with resource limits, health probes, and Prometheus scrape annotations:
+![App deployed and accessible](image-4.png)
 
+---
 
-### Prometheus showing some metrics
+### 3. Prometheus Integration
+Deployed Prometheus inside the `monitoring` namespace with RBAC service discovery and verified scraped application metrics:
+
 ![Prometheus showing metrics](image-5.png)
 
+Testing `http_requests_total` queries in the Prometheus Web UI:
+![http_requests_total](image-8.png)
 
-### Got Grafana working, still not connected to prometheus
+---
+
+### 4. Grafana Deployment & Golden Signals Dashboard
+Deployed Grafana in `monitoring` (initial UI before connecting the Prometheus data source):
 ![Grafana UI](image-6.png)
 
+Verified auto-provisioned Prometheus data source (`Successfully queried the Prometheus API`):
+![Prometheus data source verified](image-7.png)
 
-### Successfully queried the Prometheus API
-![Prometheus was queried](image-7.png)
+Verified the auto-provisioned **Orders App - SRE Observability** (4 Golden Signals) dashboard while running `src/scripts/generate_traffic.py`:
+![Traffic in Grafana](image-9.png)
 
-### Testing http_request_total
-![http_request_total](image-8.png)
+---
 
+### 5. Alertmanager Deployment & Alerting Verification
 
-### Golden signals dashboard
-Sent traffic with the script
-![Traffic in grafana](image-9.png)
+#### Monitoring Stack Overview
+Deployed Alertmanager (`prom/alertmanager:v0.28.1`) in the `monitoring` namespace alongside Prometheus and Grafana:
 
-### Monitoring stack so far
-The requirement number 5 says "Alertmanager DEPLOYMENT", so i investigated and found there is a sofware developed by the same people who developed prometheus that allows me to deploy an alertmanager software.
-![Monitorin stack](image-10.png)
+![Monitoring stack](image-10.png)
 
+#### High HTTP Error Rate Alert (`HighHttpErrorRate`)
+Triggered with `python3 src/scripts/generate_traffic.py --url <APP_URL> --mode errors --duration 75`:
 
-### High error rate fired
+- Transitioning to `Pending`:
 ![Pending](image-11.png)
 
+- Transitioning to `Firing` in Prometheus:
 ![Fired](image-12.png)
 
-![From alertmanager](image-13.png)
+- Received, grouped, and routed in Alertmanager UI:
+![From Alertmanager](image-13.png)
 
-![From Alertmnger](image-14.png)
+![From Alertmanager details](image-14.png)
 
+#### Application Outage Alert (`OrdersAppDown`)
+Triggered by scaling the application to zero replicas and then restoring healthy replicas:
+```zsh
+kubectl scale deployment/orders-app-deployment --replicas=0
+# After observing the critical alert fire, restore healthy replicas:
+kubectl scale deployment/orders-app-deployment --replicas=2
+kubectl rollout status deployment/orders-app-deployment
+```
 
-### Orders-app down fired
-Command to trigger: kubectl scale deployment/orders-app-deployment --replicas=0
+From Prometheus:
+![App down in Prometheus](image-15.png)
 
-To go back healthy: 
-kubectl scale deployment/orders-app-deployment --replicas=2                                                                                       
+From Alertmanager:
+![App down in Alertmanager](image-16.png)
 
-kubectl rollout status deployment/orders-app-deployment 
-From prometheus:
-![app down](image-15.png)
+#### High Latency Alert (`HighHttpLatencyP95`)
+Triggered using `python3 src/scripts/generate_traffic.py --url <APP_URL> --mode latency --duration 120`:
 
-From Alertmanager: 
-Tested it with the latency mode of the script
-![Alert manager](image-16.png)
-
-### High latency fired
+From Prometheus:
 ![High latency fired](image-17.png)
 
-![Alert manager](image-18.png)
+From Alertmanager:
+![High latency in Alertmanager](image-18.png)
