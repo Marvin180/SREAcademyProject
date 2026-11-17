@@ -46,6 +46,10 @@ SREProject/
 ├── uv.lock                            # Locked dependency versions
 ├── LICENSE.md                         # MIT License
 ├── CONTRIBUTING.md                    # Contribution and development guidelines
+├── ansible/                           # Declarative IaC deployment & teardown playbooks
+│   ├── inventory.ini                  # Local Ansible inventory (127.0.0.1)
+│   ├── deploy.yml                     # One-command full stack deployment playbook
+│   └── destroy.yml                    # Idempotent stack teardown playbook
 ├── screenshots/                       # Visual evidence and step-by-step implementation log
 │   ├── DocumentingImplProcess.md      # Chronological log with screenshots (image.png - image-18.png)
 │   └── image*.png                     # Captured screenshots from deployment and alert testing
@@ -78,28 +82,39 @@ SREProject/
 
 ## Prerequisites
 
-- **Docker** (for building or pulling container images)
-- **Minikube** (local Kubernetes cluster)
-- **kubectl** (configured to point to your Minikube context)
+- **Container Runtime:** **Colima** (recommended on corporate macOS environments) or **Docker**
+- **Minikube** (local Kubernetes cluster running on top of Colima/Docker)
+- **kubectl** (configured to point to your active Minikube context)
+- **Ansible** (`brew install ansible` on macOS — optional, for one-command IaC deployment)
 - **Python 3.12+** (optional, for running `src/scripts/generate_traffic.py` or local testing)
 
 ---
 
 ## Deployment Steps
 
-### 1. Start Minikube
+### 1. Start the Local Cluster (Colima + Minikube)
 ```zsh
+colima start
 minikube start
 ```
 
-### 2. Deploy `orders-app` (`default` namespace)
+### Option A: Automated Deployment with Ansible (IaC)
+Deploy the entire stack (`orders-app`, Prometheus, Grafana, and Alertmanager) in order and wait for all pods to become ready with one command:
+```zsh
+ansible-playbook -i ansible/inventory.ini ansible/deploy.yml
+```
+*(You can also deploy or re-apply a specific tier using tags, e.g., `--tags grafana` or `--tags prometheus,alertmanager`.)*
+
+### Option B: Manual Deployment Steps (`kubectl`)
+
+#### Deploy `orders-app` (`default` namespace)
 ```zsh
 kubectl apply -f src/App/deployment-app.yaml
 kubectl apply -f src/App/Service.yaml
 kubectl rollout status deployment/orders-app-deployment
 ```
 
-### 3. Deploy Prometheus (`monitoring` namespace)
+#### Deploy Prometheus (`monitoring` namespace)
 ```zsh
 kubectl apply -f src/Prometheus/namespace.yaml
 kubectl apply -f src/Prometheus/rbac.yaml
@@ -110,7 +125,7 @@ kubectl apply -f src/Prometheus/service.yaml
 kubectl rollout status deployment/prometheus-deployment -n monitoring
 ```
 
-### 4. Deploy Grafana (`monitoring` namespace)
+#### Deploy Grafana (`monitoring` namespace)
 ```zsh
 kubectl apply -f src/Grafana/datasource-configmap.yaml
 kubectl apply -f src/Grafana/dashboard-configmap.yaml
@@ -119,7 +134,7 @@ kubectl apply -f src/Grafana/service.yaml
 kubectl rollout status deployment/grafana-deployment -n monitoring
 ```
 
-### 5. Deploy Alertmanager (`monitoring` namespace)
+#### Deploy Alertmanager (`monitoring` namespace)
 ```zsh
 kubectl apply -f src/Alertmanager/configmap.yaml
 kubectl apply -f src/Alertmanager/deployment.yaml
@@ -127,7 +142,7 @@ kubectl apply -f src/Alertmanager/service.yaml
 kubectl rollout status deployment/alertmanager-deployment -n monitoring
 ```
 
-### 6. Verify Pods and Access Web UIs
+### 2. Verify Pods and Access Web UIs
 Verify all pods and services are healthy:
 ```zsh
 kubectl get pods,svc -n default
@@ -255,8 +270,14 @@ The full step-by-step deployment and verification log is available in [screensho
 
 ## Cleanup
 
-Remove all deployed Kubernetes resources from Minikube:
+Remove all deployed Kubernetes resources from Minikube using Ansible:
+```zsh
+ansible-playbook -i ansible/inventory.ini ansible/destroy.yml
+```
+
+Or remove them manually with `kubectl`:
 ```zsh
 kubectl delete -f src/App/
+kubectl delete -f src/Prometheus/rbac.yaml
 kubectl delete namespace monitoring
 ```

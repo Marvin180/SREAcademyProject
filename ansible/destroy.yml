@@ -1,0 +1,32 @@
+---
+# Idempotent teardown playbook to remove all deployed resources from Minikube
+# Run from the repository root:
+#   ansible-playbook -i ansible/inventory.ini ansible/destroy.yml
+- name: Remove SRE Observability Stack from Kubernetes
+  hosts: allhosts
+  gather_facts: false
+
+  vars:
+    repo_root: "{{ playbook_dir }}/.."
+
+  tasks:
+    - name: Delete orders-app manifests
+      ansible.builtin.command:
+        cmd: "kubectl delete -f {{ repo_root }}/{{ item }} --ignore-not-found=true"
+      loop:
+        - src/App/Service.yaml
+        - src/App/deployment-app.yaml
+      register: app_delete
+      changed_when: "'deleted' in app_delete.stdout"
+
+    - name: Delete cluster-scoped Prometheus RBAC resources
+      ansible.builtin.command:
+        cmd: "kubectl delete -f {{ repo_root }}/src/Prometheus/rbac.yaml --ignore-not-found=true"
+      register: rbac_delete
+      changed_when: "'deleted' in rbac_delete.stdout"
+
+    - name: Delete monitoring namespace and all namespaced observability resources
+      ansible.builtin.command:
+        cmd: "kubectl delete -f {{ repo_root }}/src/Prometheus/namespace.yaml --ignore-not-found=true"
+      register: ns_delete
+      changed_when: "'deleted' in ns_delete.stdout"

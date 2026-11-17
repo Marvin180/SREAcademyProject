@@ -1,0 +1,127 @@
+---
+# Automated IaC deployment playbook for orders-app and the full observability stack
+# Run from the repository root:
+#   ansible-playbook -i ansible/inventory.ini ansible/deploy.yml
+- name: Deploy SRE Observability Stack on Kubernetes
+  hosts: allhosts
+  gather_facts: false
+
+  vars:
+    repo_root: "{{ playbook_dir }}/.."
+
+    app_manifests:
+      - src/App/deployment-app.yaml
+      - src/App/Service.yaml
+
+    prometheus_manifests:
+      - src/Prometheus/namespace.yaml
+      - src/Prometheus/rbac.yaml
+      - src/Prometheus/alerts-configmap.yaml
+      - src/Prometheus/configmap.yaml
+      - src/Prometheus/deployment.yaml
+      - src/Prometheus/service.yaml
+
+    grafana_manifests:
+      - src/Grafana/datasource-configmap.yaml
+      - src/Grafana/dashboard-configmap.yaml
+      - src/Grafana/deployment.yaml
+      - src/Grafana/service.yaml
+
+    alertmanager_manifests:
+      - src/Alertmanager/configmap.yaml
+      - src/Alertmanager/deployment.yaml
+      - src/Alertmanager/service.yaml
+
+  tasks:
+    - name: Verify active Kubernetes cluster connection (Colima + Minikube)
+      ansible.builtin.command:
+        cmd: kubectl cluster-info
+      register: cluster_check
+      changed_when: false
+      failed_when: cluster_check.rc != 0
+      tags: [always]
+
+    # --- Application Tier (default namespace) ---
+    - name: Apply orders-app manifests
+      ansible.builtin.command:
+        cmd: "kubectl apply -f {{ repo_root }}/{{ item }}"
+      loop: "{{ app_manifests }}"
+      register: app_apply
+      changed_when: "'created' in app_apply.stdout or 'configured' in app_apply.stdout"
+      tags: [app]
+
+    - name: Wait for orders-app deployment rollout
+      ansible.builtin.command:
+        cmd: kubectl rollout status deployment/orders-app-deployment -n default --timeout=180s
+      changed_when: false
+      tags: [app]
+
+    # --- Prometheus Tier (monitoring namespace) ---
+    - name: Apply Prometheus manifests
+      ansible.builtin.command:
+        cmd: "kubectl apply -f {{ repo_root }}/{{ item }}"
+      loop: "{{ prometheus_manifests }}"
+      register: prometheus_apply
+      changed_when: "'created' in prometheus_apply.stdout or 'configured' in prometheus_apply.stdout"
+      tags: [prometheus]
+
+    - name: Wait for Prometheus deployment rollout
+      ansible.builtin.command:
+        cmd: kubectl rollout status deployment/prometheus-deployment -n monitoring --timeout=180s
+      changed_when: false
+      tags: [prometheus]
+
+    # --- Grafana Tier (monitoring namespace) ---
+    - name: Apply Grafana manifests
+      ansible.builtin.command:
+        cmd: "kubectl apply -f {{ repo_root }}/{{ item }}"
+      loop: "{{ grafana_manifests }}"
+      register: grafana_apply
+      changed_when: "'created' in grafana_apply.stdout or 'configured' in grafana_apply.stdout"
+      tags: [grafana]
+
+    - name: Wait for Grafana deployment rollout
+      ansible.builtin.command:
+        cmd: kubectl rollout status deployment/grafana-deployment -n monitoring --timeout=180s
+      changed_when: false
+      tags: [grafana]
+
+    # --- Alertmanager Tier (monitoring namespace) ---
+    - name: Apply Alertmanager manifests
+      ansible.builtin.command:
+        cmd: "kubectl apply -f {{ repo_root }}/{{ item }}"
+      loop: "{{ alertmanager_manifests }}"
+      register: alertmanager_apply
+      changed_when: "'created' in alertmanager_apply.stdout or 'configured' in alertmanager_apply.stdout"
+      tags: [alertmanager]
+
+    - name: Wait for Alertmanager deployment rollout
+      ansible.builtin.command:
+        cmd: kubectl rollout status deployment/alertmanager-deployment -n monitoring --timeout=180s
+      changed_when: false
+      tags: [alertmanager]
+
+    # --- Final Verification ---
+    - name: Gather default namespace status
+      ansible.builtin.command:
+        cmd: kubectl get pods,svc -n default
+      register: default_status
+      changed_when: false
+      tags: [verify]
+
+    - name: Gather monitoring namespace status
+      ansible.builtin.command:
+        cmd: kubectl get pods,svc -n monitoring
+      register: monitoring_status
+      changed_when: false
+      tags: [verify]
+
+    - name: Display deployed Kubernetes resources and next testing steps
+      ansible.builtin.debug:
+        msg:
+          - "=== default namespace ==="
+          - "{{ default_status.stdout_lines }}"
+          - "=== monitoring namespace ==="
+          - "{{ monitoring_status.stdout_lines }}"
+          - "Next: expose URLs with 'minikube service <service-name> [-n monitoring] --url' and run 'python3 src/scripts/generate_traffic.py --help'."
+      tags: [verify]
